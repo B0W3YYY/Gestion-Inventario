@@ -121,13 +121,14 @@ opcional: `Leche` + `entera 1 L` = `Leche entera 1 L`. El catalogo esta en `Regl
 Las imagenes de los productos deben estar en la carpeta `imagenes/` del proyecto (lo pide la consigna).
 En la consola, la opcion 4 muestra las imagenes de esa carpeta para elegir una por numero; en la
 ventana, **Imagenes -> + Agregar imagen** abre esa carpeta. Solo se aceptan imagenes reales
-(jpg, jpeg, png o gif) que esten dentro de `imagenes/`, y una misma imagen no se repite en un producto.
+(.jpg, .jpeg o .png) que esten dentro de `imagenes/`, y una misma imagen no se repite en un producto.
 Se guarda la ruta relativa al proyecto, por ejemplo `imagenes/ejemplo.jpg`.
+La carpeta del proyecto se busca sola (`ReglasProducto.buscarProyecto()`), asi las imagenes
+funcionan aunque el IDE ejecute el programa desde otra carpeta (por ejemplo, la de arriba).
 
 ## Como ejecutar
 
-Requiere Java 11 o superior. El programa debe ejecutarse **desde la carpeta del proyecto**
-(asi encuentra la carpeta `imagenes/`). Desde esa carpeta:
+Requiere Java 11 o superior. Desde la carpeta del proyecto:
 
 ```
 javac -encoding UTF-8 -d bin $(find src -name "*.java")

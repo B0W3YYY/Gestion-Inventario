@@ -145,11 +145,11 @@ public class Main {
         if (producto == null) {
             return;
         }
-        File[] imagenes = new File(ReglasProducto.CARPETA_IMAGENES).listFiles(
-                archivo -> archivo.isFile() && archivo.getName().toLowerCase().matches(".*\\.(jpg|jpeg|png|gif)"));
+        File carpeta = ReglasProducto.carpetaImagenes();
+        File[] imagenes = carpeta.listFiles(ReglasProducto::esArchivoDeImagen);
         if (imagenes == null || imagenes.length == 0) {
-            System.out.println("No hay imagenes en la carpeta \"" + ReglasProducto.CARPETA_IMAGENES
-                    + "\" del proyecto. Copie ahi la imagen y vuelva a intentarlo.");
+            System.out.println("No hay imagenes .jpg o .png en la carpeta \"" + paraConsola(carpeta.getPath())
+                    + "\". Copie ahi la imagen y vuelva a intentarlo.");
             return;
         }
         Arrays.sort(imagenes);

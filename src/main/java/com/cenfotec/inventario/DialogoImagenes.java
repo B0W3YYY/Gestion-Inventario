@@ -106,7 +106,7 @@ public class DialogoImagenes extends JDialog {
     private JPanel crearMiniatura(String ruta) {
         JLabel imagen = new JLabel("", SwingConstants.CENTER);
         imagen.setPreferredSize(new Dimension(ANCHO_MINIATURA, ALTO_MINIATURA));
-        BufferedImage original = ReglasProducto.leerImagen(new File(ruta));
+        BufferedImage original = ReglasProducto.leerImagen(ReglasProducto.archivoDeRuta(ruta));
         if (original != null) {
             // Se reduce la imagen manteniendo su proporcion para que quepa en la miniatura.
             double escala = Math.min(1.0, Math.min((double) ANCHO_MINIATURA / original.getWidth(),
@@ -136,9 +136,9 @@ public class DialogoImagenes extends JDialog {
      * ReglasProducto (las mismas reglas del menu de consola) y lo agrega al producto.
      */
     private void agregarImagen() {
-        JFileChooser selector = new JFileChooser(new File(ReglasProducto.CARPETA_IMAGENES));
+        JFileChooser selector = new JFileChooser(ReglasProducto.carpetaImagenes());
         selector.setDialogTitle("Seleccionar imagen de la carpeta «" + ReglasProducto.CARPETA_IMAGENES + "»");
-        selector.setFileFilter(new FileNameExtensionFilter("Imágenes (jpg, jpeg, png, gif)", "jpg", "jpeg", "png", "gif"));
+        selector.setFileFilter(new FileNameExtensionFilter("Imágenes (jpg, png)", ReglasProducto.EXTENSIONES_IMAGEN));
         selector.setAcceptAllFileFilterUsed(false);
         if (selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
             return; // el usuario cancelo

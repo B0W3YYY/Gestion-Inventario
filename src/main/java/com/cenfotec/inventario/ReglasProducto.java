@@ -4,12 +4,18 @@ import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.format.ResolverStyle;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Reglas de los productos que comparten el menu de consola y la interfaz grafica:
@@ -47,6 +53,10 @@ public class ReglasProducto {
             DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT);
     /** Carpeta del proyecto donde deben estar las imagenes (lo pide la consigna). */
     public static final String CARPETA_IMAGENES = "imagenes";
+    /** Tipos de imagen que se pueden agregar a un producto (jpeg es lo mismo que jpg). */
+    public static final String[] EXTENSIONES_IMAGEN = {"jpg", "jpeg", "png"};
+    /** Carpeta raiz del proyecto (la que contiene "imagenes" y "src"). */
+    private static final Path PROYECTO = buscarProyecto();
 
     /**
      * Arma el nombre con el tipo y el detalle (ej. "Leche" + "entera 1 L") y revisa que sea valido.
@@ -142,23 +152,56 @@ public class ReglasProducto {
         }
     }
 
+    /** Carpeta "imagenes" del proyecto, sin importar desde que carpeta se ejecute el programa. */
+    public static File carpetaImagenes() {
+        return PROYECTO.resolve(CARPETA_IMAGENES).toFile();
+    }
+
+    /** Archivo de una ruta guardada en un producto (ej. "imagenes/queso.jpg"). */
+    public static File archivoDeRuta(String ruta) {
+        return PROYECTO.resolve(ruta).toFile();
+    }
+
+    /** true si el archivo existe y tiene una extension de imagen permitida (jpg, jpeg o png). */
+    public static boolean esArchivoDeImagen(File archivo) {
+        String nombre = archivo.getName().toLowerCase(Locale.ROOT);
+        for (String extension : EXTENSIONES_IMAGEN) {
+            if (nombre.endsWith("." + extension)) {
+                return archivo.isFile();
+            }
+        }
+        return false;
+    }
+
     /**
      * Revisa que el archivo pueda agregarse como imagen del producto y retorna la ruta
      * que se guarda, relativa al proyecto (ej. "imagenes/queso.jpg").
-     * Reglas: debe estar dentro de la carpeta "imagenes" del proyecto, ser una imagen
-     * real y no estar repetida en el producto.
+     * Reglas: debe ser .jpg, .jpeg o .png, estar dentro de la carpeta "imagenes" del
+     * proyecto, ser una imagen real y no estar repetida en el producto.
      */
     public static String convertirRutaImagen(File archivo, Producto producto) {
-        Path proyecto = Path.of("").toAbsolutePath();
-        Path imagen = archivo.toPath().toAbsolutePath().normalize();
-        if (!imagen.startsWith(proyecto.resolve(CARPETA_IMAGENES))) {
-            throw new IllegalArgumentException("La imagen debe estar dentro de la carpeta «" + CARPETA_IMAGENES + "» del proyecto.");
+        if (!esArchivoDeImagen(archivo)) {
+            throw new IllegalArgumentException(archivo.exists()
+                    ? "Solo se aceptan imágenes .jpg o .png." : "El archivo no existe.");
         }
-        if (leerImagen(archivo) == null) {
-            throw new IllegalArgumentException("El archivo no existe o no es una imagen válida.");
+        Path imagen;
+        try {
+            // toRealPath da la ruta tal como esta en el disco (mayusculas, accesos directos de
+            // carpetas, etc.), asi se compara bien con la carpeta del proyecto.
+            imagen = archivo.toPath().toRealPath();
+        } catch (IOException e) {
+            throw new IllegalArgumentException("El archivo no existe.");
+        }
+        if (!imagen.startsWith(PROYECTO.resolve(CARPETA_IMAGENES))) {
+            throw new IllegalArgumentException("La imagen debe estar dentro de la carpeta «" + CARPETA_IMAGENES
+                    + "» del proyecto (" + carpetaImagenes() + ").");
+        }
+        if (leerImagen(imagen.toFile()) == null) {
+            throw new IllegalArgumentException("No se pudo leer «" + archivo.getName() + "» como imagen. Si la bajó"
+                    + " de internet puede ser de otro formato (ej. WebP) aunque diga .jpg: guárdela como JPG o PNG.");
         }
         // Siempre con "/" para que imagenes\a.jpg e imagenes/a.jpg sean la misma ruta.
-        String ruta = proyecto.relativize(imagen).toString().replace('\\', '/');
+        String ruta = PROYECTO.relativize(imagen).toString().replace('\\', '/');
         // Sin distinguir mayusculas, porque en Windows IMAGENES/A.JPG es el mismo archivo que imagenes/a.jpg.
         for (String existente : producto.getListaImagenes()) {
             if (existente.equalsIgnoreCase(ruta)) {
@@ -174,6 +217,54 @@ public class ReglasProducto {
             return archivo.isFile() ? ImageIO.read(archivo) : null;
         } catch (IOException e) {
             return null;
+        }
+    }
+
+    /**
+     * Busca la carpeta del proyecto. Antes se usaba la carpeta desde donde se ejecuta Java,
+     * pero un IDE puede ejecutar desde otra (ej. si se abrio la carpeta de arriba, "Semana5"),
+     * y entonces no se encontraba "imagenes". Se prueba, en orden: la carpeta actual y las de
+     * arriba, la de las clases compiladas (bin/ u out/ estan dentro del proyecto) y las de arriba,
+     * y por ultimo las carpetas de abajo de la actual (hasta 4 niveles).
+     */
+    private static Path buscarProyecto() {
+        Path actual = Path.of("").toAbsolutePath();
+        List<Path> inicios = new ArrayList<>();
+        inicios.add(actual);
+        try {
+            inicios.add(Path.of(ReglasProducto.class.getProtectionDomain().getCodeSource().getLocation().toURI()));
+        } catch (Exception e) {
+            // no se sabe donde estan las clases: se usan las demas opciones
+        }
+        for (Path inicio : inicios) {
+            for (Path carpeta = inicio; carpeta != null; carpeta = carpeta.getParent()) {
+                if (esProyecto(carpeta)) {
+                    return aRutaReal(carpeta);
+                }
+            }
+        }
+        try (Stream<Path> abajo = Files.find(actual, 4, (carpeta, atributos) -> atributos.isDirectory() && esProyecto(carpeta))) {
+            Optional<Path> encontrada = abajo.sorted().findFirst();
+            if (encontrada.isPresent()) {
+                return aRutaReal(encontrada.get());
+            }
+        } catch (IOException | UncheckedIOException e) {
+            // carpeta sin permiso de lectura: se deja la actual
+        }
+        return aRutaReal(actual);
+    }
+
+    /** true si la carpeta es este proyecto: tiene "imagenes" y el codigo fuente de este paquete. */
+    private static boolean esProyecto(Path carpeta) {
+        return Files.isDirectory(carpeta.resolve(CARPETA_IMAGENES))
+                && Files.isDirectory(carpeta.resolve("src/main/java/com/cenfotec/inventario"));
+    }
+
+    private static Path aRutaReal(Path carpeta) {
+        try {
+            return carpeta.toRealPath();
+        } catch (IOException e) {
+            return carpeta.toAbsolutePath().normalize();
         }
     }
 }
