@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.format.ResolverStyle;
 import java.util.Locale;
 
 /**
@@ -41,6 +42,9 @@ public class ReglasProducto {
     public static final int LARGO_MAXIMO = 50;
 
     public static final DateTimeFormatter FORMATO_FECHA = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    // Para leer lo que escribe el usuario: dia y mes con o sin cero a la izquierda.
+    private static final DateTimeFormatter FORMATO_ENTRADA =
+            DateTimeFormatter.ofPattern("d/M/uuuu").withResolverStyle(ResolverStyle.STRICT);
     /** Carpeta del proyecto donde deben estar las imagenes (lo pide la consigna). */
     public static final String CARPETA_IMAGENES = "imagenes";
 
@@ -120,24 +124,22 @@ public class ReglasProducto {
         return (int) valor;
     }
 
-    /** Convierte el texto (dd/MM/yyyy) en fecha. Vacio o "N/A" = el producto no vence (null). */
+    /** Convierte el texto (dd/MM/yyyy, tambien d/M/yyyy) en fecha. Vacio o "N/A" = el producto no vence (null). */
     public static LocalDate convertirFecha(String texto) {
         texto = texto.trim();
         if (texto.isEmpty() || texto.equalsIgnoreCase("N/A")) {
             return null;
         }
-        LocalDate fecha;
-        try {
-            fecha = LocalDate.parse(texto, FORMATO_FECHA);
-        } catch (DateTimeParseException e) {
+        // Dia y mes aceptan 1 o 2 digitos: "5/3/2027" se interpreta igual que "05/03/2027".
+        if (!texto.matches("\\d{1,2}/\\d{1,2}/\\d{4}")) {
             throw new IllegalArgumentException("Use el formato dd/mm/aaaa, por ejemplo 15/08/2027.");
         }
-        // parse "ajusta" fechas que no existen (31/02/2025 -> 28/02/2025).
-        // Si al volver a escribirla no queda igual, la fecha no existia.
-        if (!fecha.format(FORMATO_FECHA).equals(texto)) {
+        try {
+            // STRICT rechaza fechas que no existen (31/02/2025) en vez de ajustarlas.
+            return LocalDate.parse(texto, FORMATO_ENTRADA);
+        } catch (DateTimeParseException e) {
             throw new IllegalArgumentException("Esa fecha no existe en el calendario.");
         }
-        return fecha;
     }
 
     /**

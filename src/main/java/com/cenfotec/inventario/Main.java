@@ -38,7 +38,7 @@ public class Main {
         do {
             System.out.println();
             System.out.println("===== Gestion de Inventarios =====");
-            System.out.println("Productos en la lista: " + lista.getTamanio());
+            System.out.println("Productos en la lista: " + lista.getTamanio() + "\n");
             System.out.println("1. Insertar producto al inicio");
             System.out.println("2. Insertar producto al final");
             System.out.println("3. Modificar producto");
