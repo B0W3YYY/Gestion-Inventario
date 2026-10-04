@@ -2,6 +2,7 @@ package com.cenfotec.inventario;
 
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.Icon;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JDialog;
@@ -17,8 +18,11 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.GraphicsConfiguration;
 import java.awt.GridLayout;
-import java.awt.Image;
+import java.awt.RenderingHints;
+import java.awt.image.BaseMultiResolutionImage;
 import java.awt.image.BufferedImage;
 import java.io.File;
 
@@ -113,7 +117,7 @@ public class DialogoImagenes extends JDialog {
                     (double) ALTO_MINIATURA / original.getHeight()));
             int ancho = Math.max(1, (int) (original.getWidth() * escala));
             int alto = Math.max(1, (int) (original.getHeight() * escala));
-            imagen.setIcon(new ImageIcon(original.getScaledInstance(ancho, alto, Image.SCALE_SMOOTH)));
+            imagen.setIcon(crearIcono(original, ancho, alto));
         } else {
             imagen.setText("Imagen no disponible"); // el archivo se movio o se borro
             imagen.setForeground(Estilo.TEXTO_SECUNDARIO);
@@ -129,6 +133,42 @@ public class DialogoImagenes extends JDialog {
         tarjeta.add(imagen, BorderLayout.CENTER);
         tarjeta.add(nombreArchivo, BorderLayout.SOUTH);
         return tarjeta;
+    }
+
+    /**
+     * Crea el icono de la miniatura de ancho x alto. Windows suele ampliar todo (ej. escala
+     * 125%): una imagen de 180 px se dibujaria estirada en 225 px reales y se veria borrosa.
+     * Por eso tambien se prepara una version al tamaño real en pantalla, y Swing usa esa.
+     */
+    private Icon crearIcono(BufferedImage original, int ancho, int alto) {
+        BufferedImage normal = escalar(original, ancho, alto);
+        GraphicsConfiguration pantalla = getGraphicsConfiguration();
+        double escalaPantalla = (pantalla == null) ? 1.0 : pantalla.getDefaultTransform().getScaleX();
+        if (escalaPantalla <= 1.0) {
+            return new ImageIcon(normal);
+        }
+        BufferedImage nitida = escalar(original, (int) Math.round(ancho * escalaPantalla),
+                (int) Math.round(alto * escalaPantalla));
+        return new ImageIcon(new BaseMultiResolutionImage(normal, nitida));
+    }
+
+    /** Cambia el tamaño de la imagen reduciendola en pasos de a la mitad, asi no pierde detalle. */
+    private static BufferedImage escalar(BufferedImage original, int ancho, int alto) {
+        BufferedImage actual = original;
+        int w = original.getWidth();
+        int h = original.getHeight();
+        do {
+            w = Math.max(ancho, w / 2);
+            h = Math.max(alto, h / 2);
+            BufferedImage paso = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+            Graphics2D g = paso.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            g.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            g.drawImage(actual, 0, 0, w, h, null);
+            g.dispose();
+            actual = paso;
+        } while (w != ancho || h != alto);
+        return actual;
     }
 
     /**
